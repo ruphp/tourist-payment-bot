@@ -92,7 +92,7 @@ class UonRequestService
             $lines[] = 'Стоимость в валюте тура: '.$this->money($tourCurrency['price']).' '.$this->e($tourCurrency['currency']);
 
             if ($tourCurrency['rate'] !== null) {
-                $lines[] = 'Курс U-ON: '.$this->money($tourCurrency['rate']).' руб.';
+                $lines[] = 'Курс туроператора: '.$this->money($tourCurrency['rate']).' руб.';
             }
         }
 
