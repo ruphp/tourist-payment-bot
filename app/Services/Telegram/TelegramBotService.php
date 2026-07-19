@@ -113,7 +113,7 @@ class TelegramBotService
 
         $this->telegram->sendMessage(
             $chatId,
-            'Подождите, идет проверка данных в CRM...'
+            'Подождите, идет проверка данных...'
         );
 
         try {
