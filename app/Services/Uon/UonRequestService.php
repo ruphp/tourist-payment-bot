@@ -80,6 +80,10 @@ class UonRequestService
         if ($tourCurrency) {
             $lines[] = 'Стоимость в валюте тура: '.$this->money($tourCurrency['price']).' '.$this->e($tourCurrency['currency']);
 
+            if ($tourCurrency['rate'] !== null) {
+                $lines[] = 'Курс U-ON: '.$this->money($tourCurrency['rate']).' руб.';
+            }
+
             if ($tourCurrency['paid'] !== null) {
                 $lines[] = 'Оплачено в валюте: '.$this->money($tourCurrency['paid']).' '.$this->e($tourCurrency['currency']);
             }
@@ -200,6 +204,7 @@ class UonRequestService
         return [
             'currency' => $currency,
             'price' => $price,
+            'rate' => $rate > 1 ? $rate : null,
             'paid' => $canConvertRubAmounts && $rubPaid > 0 ? $rubPaid / $rate : null,
             'balance' => $canConvertRubAmounts ? $rubBalance / $rate : null,
         ];

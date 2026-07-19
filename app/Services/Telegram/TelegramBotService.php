@@ -161,6 +161,8 @@ class TelegramBotService
             'state_data' => [],
         ])->save();
 
+        $binding = $this->uonRequests->refresh($binding);
+
         $this->telegram->sendMessage($chatId, $this->uonRequests->formatSummary($binding));
     }
 
