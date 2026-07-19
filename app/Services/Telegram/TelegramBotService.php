@@ -111,6 +111,11 @@ class TelegramBotService
             return;
         }
 
+        $this->telegram->sendMessage(
+            $chatId,
+            'Подождите, идет проверка данных в CRM...'
+        );
+
         try {
             $binding = $this->uonRequests->authorize($user, $contractNumber, $text);
         } catch (RequestException $exception) {
