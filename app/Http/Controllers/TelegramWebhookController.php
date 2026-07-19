@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\Telegram\TelegramClient;
+use App\Services\Telegram\TelegramBotService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class TelegramWebhookController extends Controller
 {
-    public function __invoke(Request $request, TelegramClient $telegram): JsonResponse
+    public function __invoke(Request $request, TelegramBotService $bot): JsonResponse
     {
         if (!$this->hasValidSecret($request)) {
             abort(403);
@@ -19,15 +19,7 @@ class TelegramWebhookController extends Controller
         $message = $update['message'] ?? null;
 
         if ($message) {
-            $chatId = $message['chat']['id'] ?? null;
-            $text = trim((string) ($message['text'] ?? ''));
-
-            if ($chatId && $text === '/start') {
-                $telegram->sendMessage(
-                    $chatId,
-                    'Здравствуйте. Для входа отправьте номер договора и телефон.'
-                );
-            }
+            $bot->handleMessage($message);
         }
 
         Log::info('Telegram update received', [

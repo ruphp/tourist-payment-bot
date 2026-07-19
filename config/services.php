@@ -40,4 +40,9 @@ return [
         'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET'),
     ],
 
+    'uon' => [
+        'api_key' => env('UON_API_KEY'),
+        'base_url' => env('UON_BASE_URL', 'https://api.u-on.ru'),
+    ],
+
 ];
