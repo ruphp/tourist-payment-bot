@@ -60,7 +60,12 @@ class UonRequestService
     {
         $request = $binding->last_request_snapshot ?? [];
 
-        $title = $this->tourTitle($request);
+        $operator = $this->tourOperator($request);
+        $reservationNumber = $this->reservationNumber($request);
+        $country = $this->country($request);
+        $hotel = $this->hotel($request);
+        $dateBegin = $this->tourDate($request, ['date_begin', 'tour_date_begin', 'date_from']);
+        $dateEnd = $this->tourDate($request, ['date_end', 'tour_date_end', 'date_to']);
         $price = $this->number($this->value($request, ['calc_price']));
         $paid = $this->number($this->value($request, ['calc_client', 'calc_increase']));
         $balance = max(0, $price - $paid);
@@ -71,7 +76,12 @@ class UonRequestService
         $lines = [
             '<b>Заявка найдена</b>',
             'Договор/заявка: '.$this->e($binding->contract_number),
-            'Тур: '.$this->e($title),
+            'Туроператор: '.$this->e($operator),
+            'Номер бронирования: '.$this->e($reservationNumber),
+            'Страна: '.$this->e($country),
+            'Отель: '.$this->e($hotel),
+            'Дата начала тура: '.$this->e($dateBegin),
+            'Дата окончания тура: '.$this->e($dateEnd),
         ];
 
         if ($price > 0) {
@@ -174,12 +184,40 @@ class UonRequestService
         return null;
     }
 
-    private function tourTitle(array $request): string
+    private function tourOperator(array $request): string
     {
-        return (string) ($this->value($request, ['travel_type'])
-            ?: $this->value($request, ['supplier_name'])
-            ?: $this->value($request, ['reservation_number'])
-            ?: 'тур');
+        return (string) ($this->value($request, ['supplier_name', 'operator_name', 'tour_operator'])
+            ?: $this->valueFromServices($request, ['supplier_name', 'operator_name', 'tour_operator'])
+            ?: 'не указано');
+    }
+
+    private function reservationNumber(array $request): string
+    {
+        return (string) ($this->value($request, ['reservation_number', 'booking_number', 'bron_number', 'supplier_booking_number'])
+            ?: $this->valueFromServices($request, ['reservation_number', 'booking_number', 'bron_number', 'supplier_booking_number'])
+            ?: 'не указано');
+    }
+
+    private function country(array $request): string
+    {
+        return (string) ($this->value($request, ['country', 'country_name', 'tour_country'])
+            ?: $this->valueFromServices($request, ['country', 'country_name', 'tour_country'])
+            ?: 'не указано');
+    }
+
+    private function hotel(array $request): string
+    {
+        return (string) ($this->value($request, ['hotel', 'hotel_name', 'hostel', 'placement'])
+            ?: $this->valueFromServices($request, ['hotel', 'hotel_name', 'hostel', 'placement'])
+            ?: 'не указано');
+    }
+
+    private function tourDate(array $request, array $keys): string
+    {
+        $date = $this->value($request, $keys)
+            ?: $this->valueFromServices($request, $keys);
+
+        return $date ? $this->formatDate((string) $date) : 'не указано';
     }
 
     private function currencyLabel(array $request): string
@@ -395,6 +433,23 @@ class UonRequestService
     {
         foreach ($keys as $key) {
             $value = Arr::get($source, $key);
+
+            if ($value !== null && $value !== '') {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    private function valueFromServices(array $request, array $keys): mixed
+    {
+        foreach (($request['services'] ?? []) as $service) {
+            if (!is_array($service)) {
+                continue;
+            }
+
+            $value = $this->value($service, $keys);
 
             if ($value !== null && $value !== '') {
                 return $value;
