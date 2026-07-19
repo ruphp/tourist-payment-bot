@@ -43,9 +43,10 @@ class UonRequestService
 
     public function refresh(UonBinding $binding): UonBinding
     {
-        $request = $this->client->getRequest($binding->uon_request_id);
+        $request = $this->findByContractNumber($binding->contract_number)
+            ?: $this->client->getRequest($binding->uon_request_id);
 
-        if ($request) {
+        if ($request && $this->hasUsefulFinancialData($request)) {
             $binding->forceFill([
                 'last_request_snapshot' => $request,
                 'last_synced_at' => now(),
@@ -112,14 +113,6 @@ class UonRequestService
     {
         $number = trim($contractNumber);
 
-        if (ctype_digit($number)) {
-            $request = $this->client->getRequest($number);
-
-            if ($request) {
-                return $request;
-            }
-        }
-
         foreach (['r_id_internal', 'id_internal', 'reservation_number', 'r_id_system', 'id_system'] as $field) {
             $matches = $this->client->searchRequests([$field => $number]);
 
@@ -128,7 +121,22 @@ class UonRequestService
             }
         }
 
+        if (ctype_digit($number)) {
+            $request = $this->client->getRequest($number);
+
+            if ($request) {
+                return $request;
+            }
+        }
+
         return null;
+    }
+
+    private function hasUsefulFinancialData(array $request): bool
+    {
+        return $this->number($this->value($request, ['calc_price'])) > 0
+            || $this->number($this->value($request, ['calc_client', 'calc_increase'])) > 0
+            || !empty($request['services']);
     }
 
     private function phoneMatches(array $request, string $phone): bool
