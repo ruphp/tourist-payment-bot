@@ -94,18 +94,10 @@ class UonRequestService
             if ($tourCurrency['rate'] !== null) {
                 $lines[] = 'Курс U-ON: '.$this->money($tourCurrency['rate']).' руб.';
             }
-
-            if ($tourCurrency['paid'] !== null) {
-                $lines[] = 'Оплачено в валюте: '.$this->money($tourCurrency['paid']).' '.$this->e($tourCurrency['currency']);
-            }
-
-            if ($tourCurrency['balance'] !== null) {
-                $lines[] = 'Остаток в валюте тура: '.$this->money($tourCurrency['balance']).' '.$this->e($tourCurrency['currency']);
-            }
         }
 
-        $lines[] = 'Оплачено: '.$this->money($paid).' '.$this->e($currency);
-        $lines[] = 'Остаток: '.$this->money($balance).' '.$this->e($currency);
+        $lines[] = 'Оплачено: '.$this->moneyWithTourCurrency($paid, $currency, $tourCurrency['paid'] ?? null, $tourCurrency['currency'] ?? null);
+        $lines[] = 'Остаток: '.$this->moneyWithTourCurrency($balance, $currency, $tourCurrency['balance'] ?? null, $tourCurrency['currency'] ?? null);
 
         if ($deadline) {
             $lines[] = 'Оплатить до: '.$this->e($deadline);
@@ -245,6 +237,10 @@ class UonRequestService
             return null;
         }
 
+        if ($rate <= 1 && $rubPrice > 0) {
+            $rate = $rubPrice / $price;
+        }
+
         $canConvertRubAmounts = $rate > 1;
 
         return [
@@ -267,6 +263,17 @@ class UonRequestService
         }
 
         return null;
+    }
+
+    private function moneyWithTourCurrency(float $rubAmount, string $rubCurrency, ?float $tourAmount, ?string $tourCurrency): string
+    {
+        $value = $this->money($rubAmount).' '.$this->e($rubCurrency);
+
+        if ($tourAmount !== null && $tourCurrency) {
+            $value .= ' / '.$this->money($tourAmount).' '.$this->e($tourCurrency);
+        }
+
+        return $value;
     }
 
     private function tourCurrencyLabel(array $request): ?string
