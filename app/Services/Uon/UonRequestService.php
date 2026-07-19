@@ -195,11 +195,13 @@ class UonRequestService
             return null;
         }
 
+        $canConvertRubAmounts = $rate > 1;
+
         return [
             'currency' => $currency,
             'price' => $price,
-            'paid' => $rate > 0 && $rubPaid > 0 ? $rubPaid / $rate : null,
-            'balance' => $rate > 0 ? $rubBalance / $rate : null,
+            'paid' => $canConvertRubAmounts && $rubPaid > 0 ? $rubPaid / $rate : null,
+            'balance' => $canConvertRubAmounts ? $rubBalance / $rate : null,
         ];
     }
 
@@ -212,6 +214,8 @@ class UonRequestService
             'currency_tour_code',
         ]) ?: '');
 
+        $currency = $this->normalizeCurrencyLabel($currency);
+
         if ($currency && !$this->isRubCurrency($currency)) {
             return $currency;
         }
@@ -221,7 +225,9 @@ class UonRequestService
                 continue;
             }
 
-            $currency = (string) ($this->value($service, ['currency_code', 'currency']) ?: '');
+            $currency = $this->normalizeCurrencyLabel(
+                (string) ($this->value($service, ['currency_code', 'currency']) ?: '')
+            );
 
             if ($currency && !$this->isRubCurrency($currency)) {
                 return $currency;
@@ -251,7 +257,9 @@ class UonRequestService
                 continue;
             }
 
-            $currency = (string) ($this->value($service, ['currency_code', 'currency']) ?: '');
+            $currency = $this->normalizeCurrencyLabel(
+                (string) ($this->value($service, ['currency_code', 'currency']) ?: '')
+            );
 
             if ($currency === '' || $this->isRubCurrency($currency)) {
                 continue;
@@ -304,7 +312,19 @@ class UonRequestService
 
     private function isRubCurrency(string $currency): bool
     {
-        return in_array(mb_strtolower(trim($currency)), ['rub', 'rur', 'руб', 'руб.', '₽'], true);
+        return in_array(mb_strtolower(trim($currency)), ['643', 'rub', 'rur', 'руб', 'руб.', '₽'], true);
+    }
+
+    private function normalizeCurrencyLabel(string $currency): string
+    {
+        $currency = trim($currency);
+
+        return match ($currency) {
+            '643' => 'RUB',
+            '840' => 'USD',
+            '978' => 'EUR',
+            default => $currency,
+        };
     }
 
     private function paymentWindowText(): string
