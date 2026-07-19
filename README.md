@@ -40,6 +40,20 @@ TOCHKA_CLIENT_SECRET=
 TOCHKA_WEBHOOK_SECRET=
 ```
 
+## MVP bot behavior
+
+One Telegram user has one active U-ON request binding.
+
+Flow:
+
+- tourist logs in with contract/request A and phone;
+- bot remembers contract/request A;
+- `/status` shows contract/request A;
+- to switch to contract/request B, tourist sends `/logout`;
+- after `/logout`, tourist enters contract/request B and phone again.
+
+Multiple active contracts per Telegram user are intentionally out of MVP scope.
+
 ## Production notes
 
 For a small VPS, keep the runtime light:
