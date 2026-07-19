@@ -115,23 +115,61 @@ class UonRequestService
     {
         $number = trim($contractNumber);
 
-        foreach (['r_id_internal', 'id_internal', 'reservation_number', 'r_id_system', 'id_system'] as $field) {
+        $fields = $this->contractNumberFields();
+
+        foreach ($fields as $field) {
             $matches = $this->client->searchRequests([$field => $number]);
 
-            if ($matches) {
-                return $matches[0];
+            foreach ($matches as $match) {
+                if ($this->contractNumberMatches($match, $number)) {
+                    return $match;
+                }
             }
         }
 
         if (ctype_digit($number)) {
             $request = $this->client->getRequest($number);
 
-            if ($request) {
+            if ($request && $this->contractNumberMatches($request, $number)) {
                 return $request;
             }
         }
 
         return null;
+    }
+
+    private function contractNumberMatches(array $request, string $number): bool
+    {
+        foreach ($this->contractNumberFields() as $field) {
+            $value = $this->value($request, [$field]);
+
+            if ($value !== null && $this->sameNumber((string) $value, $number)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function contractNumberFields(): array
+    {
+        return [
+            'r_id_internal',
+            'id_internal',
+            'reservation_number',
+            'booking_number',
+            'bron_number',
+            'supplier_booking_number',
+            'r_id_system',
+            'id_system',
+            'id',
+            'r_id',
+        ];
+    }
+
+    private function sameNumber(string $left, string $right): bool
+    {
+        return trim($left) === trim($right);
     }
 
     private function hasUsefulFinancialData(array $request): bool
