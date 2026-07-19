@@ -56,7 +56,7 @@ class TelegramBotService
 
         $this->telegram->sendMessage(
             $chatId,
-            "Здравствуйте.\n\nОтправьте номер договора или заявки."
+            "Здравствуйте.\n\nОтправьте номер договора или заявки.\n\nБот работает с одним активным договором. Чтобы перейти к другому договору, отправьте /logout и войдите заново."
         );
     }
 
@@ -172,7 +172,10 @@ class TelegramBotService
             'state_data' => [],
         ])->save();
 
-        $this->telegram->sendMessage($chatId, 'Привязка сброшена. Отправьте номер договора или заявки.');
+        $this->telegram->sendMessage(
+            $chatId,
+            'Привязка сброшена. Отправьте номер договора или заявки, к которому хотите перейти.'
+        );
     }
 
     private function telegramUser(array $message): TelegramUser
