@@ -90,7 +90,7 @@ class UonRequestService
             }
 
             if ($tourCurrency['balance'] !== null) {
-                $lines[] = 'Остаток в валюте: '.$this->money($tourCurrency['balance']).' '.$this->e($tourCurrency['currency']);
+                $lines[] = 'Остаток в валюте тура: '.$this->money($tourCurrency['balance']).' '.$this->e($tourCurrency['currency']);
             }
         }
 
@@ -214,8 +214,21 @@ class UonRequestService
             'price' => $price,
             'rate' => $rate > 1 ? $rate : null,
             'paid' => $canConvertRubAmounts && $rubPaid > 0 ? $rubPaid / $rate : null,
-            'balance' => $canConvertRubAmounts ? $rubBalance / $rate : null,
+            'balance' => $this->tourCurrencyBalance($price, $rubPaid, $rubBalance, $rate),
         ];
+    }
+
+    private function tourCurrencyBalance(float $tourCurrencyPrice, float $rubPaid, float $rubBalance, float $rate): ?float
+    {
+        if ($rate > 1) {
+            return $rubBalance / $rate;
+        }
+
+        if ($rubPaid <= 0) {
+            return $tourCurrencyPrice;
+        }
+
+        return null;
     }
 
     private function tourCurrencyLabel(array $request): ?string
