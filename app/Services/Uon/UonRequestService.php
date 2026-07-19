@@ -64,6 +64,7 @@ class UonRequestService
         $paid = $this->number($this->value($request, ['calc_client', 'calc_increase']));
         $balance = max(0, $price - $paid);
         $currency = $this->currencyLabel($request);
+        $tourCurrency = $this->tourCurrencySummary($request, $price, $paid, $balance);
         $deadline = $this->paymentDeadline($binding->uon_request_id);
 
         $lines = [
@@ -76,6 +77,18 @@ class UonRequestService
             $lines[] = 'Стоимость: '.$this->money($price).' '.$this->e($currency);
         }
 
+        if ($tourCurrency) {
+            $lines[] = 'Стоимость в валюте тура: '.$this->money($tourCurrency['price']).' '.$this->e($tourCurrency['currency']);
+
+            if ($tourCurrency['paid'] !== null) {
+                $lines[] = 'Оплачено в валюте: '.$this->money($tourCurrency['paid']).' '.$this->e($tourCurrency['currency']);
+            }
+
+            if ($tourCurrency['balance'] !== null) {
+                $lines[] = 'Остаток в валюте: '.$this->money($tourCurrency['balance']).' '.$this->e($tourCurrency['currency']);
+            }
+        }
+
         $lines[] = 'Оплачено: '.$this->money($paid).' '.$this->e($currency);
         $lines[] = 'Остаток: '.$this->money($balance).' '.$this->e($currency);
 
@@ -84,6 +97,7 @@ class UonRequestService
         }
 
         $lines[] = '';
+        $lines[] = 'Чтобы посмотреть другой договор, отправьте /logout и войдите заново.';
         $lines[] = 'Оплату через бот подключим после включения эквайринга Точки.';
 
         return implode("\n", $lines);
@@ -159,6 +173,137 @@ class UonRequestService
     {
         return (string) ($this->value($request, ['currency_code', 'currency'])
             ?: 'руб.');
+    }
+
+    private function tourCurrencySummary(array $request, float $rubPrice, float $rubPaid, float $rubBalance): ?array
+    {
+        $currency = $this->tourCurrencyLabel($request);
+
+        if (!$currency) {
+            return null;
+        }
+
+        $price = $this->tourCurrencyPrice($request);
+        $rate = $this->tourCurrencyRate($request);
+
+        if ($price <= 0 && $rate > 0 && $rubPrice > 0) {
+            $price = $rubPrice / $rate;
+        }
+
+        if ($price <= 0) {
+            return null;
+        }
+
+        return [
+            'currency' => $currency,
+            'price' => $price,
+            'paid' => $rate > 0 && $rubPaid > 0 ? $rubPaid / $rate : null,
+            'balance' => $rate > 0 ? $rubBalance / $rate : null,
+        ];
+    }
+
+    private function tourCurrencyLabel(array $request): ?string
+    {
+        $currency = (string) ($this->value($request, [
+            'tour_currency',
+            'tour_currency_code',
+            'currency_tour',
+            'currency_tour_code',
+        ]) ?: '');
+
+        if ($currency && !$this->isRubCurrency($currency)) {
+            return $currency;
+        }
+
+        foreach (($request['services'] ?? []) as $service) {
+            if (!is_array($service)) {
+                continue;
+            }
+
+            $currency = (string) ($this->value($service, ['currency_code', 'currency']) ?: '');
+
+            if ($currency && !$this->isRubCurrency($currency)) {
+                return $currency;
+            }
+        }
+
+        return null;
+    }
+
+    private function tourCurrencyPrice(array $request): float
+    {
+        $direct = $this->number($this->value($request, [
+            'tour_price_currency',
+            'price_currency',
+            'currency_price',
+            'price_tour_currency',
+        ]));
+
+        if ($direct > 0) {
+            return $direct;
+        }
+
+        $total = 0.0;
+
+        foreach (($request['services'] ?? []) as $service) {
+            if (!is_array($service)) {
+                continue;
+            }
+
+            $currency = (string) ($this->value($service, ['currency_code', 'currency']) ?: '');
+
+            if ($currency === '' || $this->isRubCurrency($currency)) {
+                continue;
+            }
+
+            $total += $this->number($this->value($service, [
+                'price',
+                'cost',
+                'sum',
+                'amount',
+                'client_price',
+            ]));
+        }
+
+        return $total;
+    }
+
+    private function tourCurrencyRate(array $request): float
+    {
+        $rate = $this->number($this->value($request, [
+            'koef',
+            'rate',
+            'currency_rate',
+            'course',
+        ]));
+
+        if ($rate > 0) {
+            return $rate;
+        }
+
+        foreach (($request['services'] ?? []) as $service) {
+            if (!is_array($service)) {
+                continue;
+            }
+
+            $rate = $this->number($this->value($service, [
+                'koef',
+                'rate',
+                'currency_rate',
+                'course',
+            ]));
+
+            if ($rate > 0) {
+                return $rate;
+            }
+        }
+
+        return 0.0;
+    }
+
+    private function isRubCurrency(string $currency): bool
+    {
+        return in_array(mb_strtolower(trim($currency)), ['rub', 'rur', 'руб', 'руб.', '₽'], true);
     }
 
     private function normalizePhone(string $phone): string
