@@ -49,6 +49,21 @@ class TelegramBotService
 
     private function start(TelegramUser $user, int|string $chatId): void
     {
+        $binding = $user->uonBinding;
+
+        if ($binding) {
+            $user->forceFill([
+                'state' => 'authorized',
+                'state_data' => [],
+            ])->save();
+
+            $this->telegram->sendMessage(
+                $chatId,
+                "Вы уже вошли по договору/заявке: ".$binding->contract_number."\nТелефон: ".$binding->phone."\n\nЧтобы перейти к другому договору, отправьте /logout и войдите заново.\n\nДля просмотра текущей информации отправьте /status."
+            );
+            return;
+        }
+
         $user->forceFill([
             'state' => 'awaiting_contract_number',
             'state_data' => [],
@@ -56,7 +71,7 @@ class TelegramBotService
 
         $this->telegram->sendMessage(
             $chatId,
-            "Здравствуйте.\n\nОтправьте номер договора или заявки.\n\nБот работает с одним активным договором. Чтобы перейти к другому договору, отправьте /logout и войдите заново."
+            "Здравствуйте.\n\nОтправьте номер договора или заявки."
         );
     }
 
