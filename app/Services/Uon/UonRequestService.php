@@ -97,6 +97,7 @@ class UonRequestService
         }
 
         $lines[] = '';
+        $lines[] = $this->paymentWindowText();
         $lines[] = 'Чтобы посмотреть другой договор, отправьте /logout и войдите заново.';
         $lines[] = 'Оплату через бот подключим после включения эквайринга Точки.';
 
@@ -304,6 +305,16 @@ class UonRequestService
     private function isRubCurrency(string $currency): bool
     {
         return in_array(mb_strtolower(trim($currency)), ['rub', 'rur', 'руб', 'руб.', '₽'], true);
+    }
+
+    private function paymentWindowText(): string
+    {
+        return sprintf(
+            'Платежи принимаются с %s до %s по МСК. После %s оплату через бот создать нельзя.',
+            config('payments.accept_from', '07:00'),
+            config('payments.accept_until', '17:00'),
+            config('payments.accept_until', '17:00'),
+        );
     }
 
     private function normalizePhone(string $phone): string

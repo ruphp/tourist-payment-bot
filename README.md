@@ -38,6 +38,10 @@ UON_BASE_URL=https://api.u-on.ru
 TOCHKA_CLIENT_ID=
 TOCHKA_CLIENT_SECRET=
 TOCHKA_WEBHOOK_SECRET=
+
+PAYMENT_TIMEZONE=Europe/Moscow
+PAYMENT_ACCEPT_FROM=07:00
+PAYMENT_ACCEPT_UNTIL=17:00
 ```
 
 ## MVP bot behavior
@@ -53,6 +57,14 @@ Flow:
 - after `/logout`, tourist enters contract/request B and phone again.
 
 Multiple active contracts per Telegram user are intentionally out of MVP scope.
+
+## Payment acceptance window
+
+Payments are accepted only from `07:00` to `17:00` Moscow time.
+
+Reason: after `17:00`, the agency may not have enough time to pay suppliers on the same operator exchange rate. If the rate changes later, previously accepted funds may no longer cover the tour balance.
+
+When Tochka acquiring is connected, payment link creation must be blocked outside this window.
 
 ## Production notes
 
