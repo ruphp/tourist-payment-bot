@@ -4,6 +4,7 @@ namespace App\Services\Telegram;
 
 use App\Models\TelegramUser;
 use App\Services\Uon\UonRequestService;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Log;
 
 class TelegramBotService
@@ -112,6 +113,18 @@ class TelegramBotService
 
         try {
             $binding = $this->uonRequests->authorize($user, $contractNumber, $text);
+        } catch (RequestException $exception) {
+            Log::error('U-ON authorization request failed', [
+                'telegram_user_id' => $user->id,
+                'status' => $exception->response->status(),
+                'body' => $exception->response->body(),
+            ]);
+
+            $this->telegram->sendMessage(
+                $chatId,
+                $this->uonErrorMessage($exception)
+            );
+            return;
         } catch (\Throwable $exception) {
             Log::error('U-ON authorization failed', [
                 'telegram_user_id' => $user->id,
@@ -166,6 +179,17 @@ class TelegramBotService
         try {
             $binding = $this->uonRequests->refresh($binding);
             $this->telegram->sendMessage($chatId, $this->uonRequests->formatSummary($binding));
+        } catch (RequestException $exception) {
+            Log::error('U-ON status refresh request failed', [
+                'telegram_user_id' => $user->id,
+                'status' => $exception->response->status(),
+                'body' => $exception->response->body(),
+            ]);
+
+            $this->telegram->sendMessage(
+                $chatId,
+                $this->uonErrorMessage($exception)
+            );
         } catch (\Throwable $exception) {
             Log::error('U-ON status refresh failed', [
                 'telegram_user_id' => $user->id,
@@ -211,5 +235,20 @@ class TelegramBotService
                 'last_name' => $from['last_name'] ?? null,
             ]
         );
+    }
+
+    private function uonErrorMessage(RequestException $exception): string
+    {
+        $body = $exception->response->body();
+
+        if ($exception->response->status() === 406 && str_contains($body, 'API is not active')) {
+            return 'API в U-ON еще не активирован. Нужно включить API в настройках U-ON и сохранить API-ключ.';
+        }
+
+        if (in_array($exception->response->status(), [401, 403], true)) {
+            return 'U-ON не принял API-ключ или IP сервера. Нужно проверить ключ и разрешенный IP.';
+        }
+
+        return 'Не удалось обратиться к U-ON. Попробуйте позже.';
     }
 }
