@@ -293,8 +293,6 @@ class TelegramBotService
             'inline_keyboard' => [
                 [
                     ['text' => 'Обновить данные', 'callback_data' => 'status'],
-                ],
-                [
                     ['text' => 'Другой договор', 'callback_data' => 'logout'],
                 ],
             ],

@@ -237,9 +237,11 @@ class UonRequestService
 
     private function hotel(array $request): string
     {
-        return (string) ($this->value($request, ['hotel', 'hotel_name', 'hostel', 'placement'])
+        $hotel = (string) ($this->value($request, ['hotel', 'hotel_name', 'hostel', 'placement'])
             ?: $this->valueFromServices($request, ['hotel', 'hotel_name', 'hostel', 'placement'])
             ?: 'не указано');
+
+        return $this->normalizeHotelStars($hotel);
     }
 
     private function tourDate(array $request, array $keys): string
@@ -472,6 +474,23 @@ class UonRequestService
         } catch (\Throwable) {
             return $date;
         }
+    }
+
+    private function normalizeHotelStars(string $hotel): string
+    {
+        $hotel = trim($hotel);
+
+        if ($hotel === 'не указано') {
+            return $hotel;
+        }
+
+        $hotel = preg_replace_callback('/(?<!\d)([1-5])\s*(?:\*{1,5}|★{1,5})(?!\*)/u', function (array $matches): string {
+            return $matches[1].' *';
+        }, $hotel) ?? $hotel;
+
+        return preg_replace_callback('/(?<!\d)(\*{2,5}|★{2,5})(?!\*)/u', function (array $matches): string {
+            return mb_strlen($matches[1]).' *';
+        }, $hotel) ?? $hotel;
     }
 
     private function value(array $source, array $keys): mixed
