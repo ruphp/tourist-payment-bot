@@ -30,6 +30,11 @@ class TochkaClient
         ]);
     }
 
+    public function createPayment(array $payload): Response
+    {
+        return $this->http()->post('acquiring/v1.0/payments', $payload);
+    }
+
     private function http(): PendingRequest
     {
         $token = config('services.tochka.jwt_token');

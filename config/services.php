@@ -50,6 +50,8 @@ return [
         'jwt_token' => env('TOCHKA_JWT_TOKEN'),
         'base_url' => env('TOCHKA_BASE_URL', 'https://enter.tochka.com/uapi'),
         'customer_code' => env('TOCHKA_CUSTOMER_CODE'),
+        'merchant_id' => env('TOCHKA_MERCHANT_ID'),
+        'terminal_id' => env('TOCHKA_TERMINAL_ID'),
         'webhook_secret' => env('TOCHKA_WEBHOOK_SECRET'),
     ],
 
