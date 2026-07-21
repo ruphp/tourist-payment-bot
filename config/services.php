@@ -45,4 +45,11 @@ return [
         'base_url' => env('UON_BASE_URL', 'https://api.u-on.ru'),
     ],
 
+    'tochka' => [
+        'client_id' => env('TOCHKA_CLIENT_ID'),
+        'jwt_token' => env('TOCHKA_JWT_TOKEN'),
+        'base_url' => env('TOCHKA_BASE_URL', 'https://enter.tochka.com/uapi'),
+        'webhook_secret' => env('TOCHKA_WEBHOOK_SECRET'),
+    ],
+
 ];
