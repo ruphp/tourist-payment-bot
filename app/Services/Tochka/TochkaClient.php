@@ -18,6 +18,11 @@ class TochkaClient
         return $this->http()->get('open-banking/v1.0/accounts');
     }
 
+    public function retailers(): Response
+    {
+        return $this->http()->get('acquiring/v1.0/retailers');
+    }
+
     private function http(): PendingRequest
     {
         $token = config('services.tochka.jwt_token');
