@@ -71,17 +71,21 @@ class UonRequestService
         $balance = max(0, $price - $paid);
         $currency = $this->currencyLabel($request);
         $tourCurrency = $this->tourCurrencySummary($request, $price, $paid, $balance);
-        $deadline = $this->paymentDeadline($binding->uon_request_id);
-
         $lines = [
             '<b>Заявка найдена</b>',
+            '',
+            '<b>Поставщик</b>',
             'Договор/заявка: '.$this->e($binding->contract_number),
             'Туроператор: '.$this->e($operator),
             'Номер бронирования: '.$this->e($reservationNumber),
+            '',
+            '<b>Параметры</b>',
             'Страна: '.$this->e($country),
             'Отель: '.$this->e($hotel),
             'Дата начала тура: '.$this->e($dateBegin),
             'Дата окончания тура: '.$this->e($dateEnd),
+            '',
+            '<b>Финансы</b>',
         ];
 
         if ($price > 0) {
@@ -90,23 +94,10 @@ class UonRequestService
 
         if ($tourCurrency) {
             $lines[] = 'Стоимость в валюте тура: '.$this->money($tourCurrency['price']).' '.$this->e($tourCurrency['currency']);
-
-            if ($tourCurrency['rate'] !== null) {
-                $lines[] = 'Курс туроператора: '.$this->money($tourCurrency['rate']).' руб.';
-            }
         }
 
         $lines[] = 'Оплачено: '.$this->moneyWithTourCurrency($paid, $currency, $tourCurrency['paid'] ?? null, $tourCurrency['currency'] ?? null);
         $lines[] = 'Остаток: '.$this->moneyWithTourCurrency($balance, $currency, $tourCurrency['balance'] ?? null, $tourCurrency['currency'] ?? null);
-
-        if ($deadline) {
-            $lines[] = 'Оплатить до: '.$this->e($deadline);
-        }
-
-        $lines[] = '';
-        $lines[] = $this->paymentWindowText();
-        $lines[] = 'Чтобы посмотреть другой договор, отправьте /logout и войдите заново.';
-        $lines[] = 'Оплату через бот подключим после включения эквайринга Точки.';
 
         return implode("\n", $lines);
     }
