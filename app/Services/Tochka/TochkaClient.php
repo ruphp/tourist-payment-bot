@@ -18,9 +18,16 @@ class TochkaClient
         return $this->http()->get('open-banking/v1.0/accounts');
     }
 
-    public function retailers(): Response
+    public function customers(): Response
     {
-        return $this->http()->get('acquiring/v1.0/retailers');
+        return $this->http()->get('open-banking/v1.0/customers');
+    }
+
+    public function retailers(string $customerCode): Response
+    {
+        return $this->http()->get('acquiring/v1.0/retailers', [
+            'customerCode' => $customerCode,
+        ]);
     }
 
     private function http(): PendingRequest

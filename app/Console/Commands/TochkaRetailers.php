@@ -8,7 +8,9 @@ use Illuminate\Support\Arr;
 
 class TochkaRetailers extends Command
 {
-    protected $signature = 'tochka:retailers {--raw : Show raw response body}';
+    protected $signature = 'tochka:retailers
+        {--customer-code= : Tochka customerCode from tochka:customers}
+        {--raw : Show raw response body}';
 
     protected $description = 'Show Tochka acquiring retailers and merchant ids.';
 
@@ -20,7 +22,16 @@ class TochkaRetailers extends Command
             return self::FAILURE;
         }
 
-        $response = $client->retailers();
+        $customerCode = $this->option('customer-code') ?: config('services.tochka.customer_code');
+
+        if (!$customerCode) {
+            $this->error('TOCHKA_CUSTOMER_CODE is not configured.');
+            $this->line('Run: php artisan tochka:customers');
+
+            return self::FAILURE;
+        }
+
+        $response = $client->retailers((string) $customerCode);
 
         if (!$response->successful()) {
             $this->error('Tochka retailers request failed.');
