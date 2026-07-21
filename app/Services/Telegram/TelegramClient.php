@@ -7,12 +7,25 @@ use Illuminate\Support\Facades\Http;
 
 class TelegramClient
 {
-    public function sendMessage(int|string $chatId, string $text): void
+    public function sendMessage(int|string $chatId, string $text, ?array $replyMarkup = null): void
     {
-        $this->http()->post('sendMessage', [
+        $payload = [
             'chat_id' => $chatId,
             'text' => $text,
             'parse_mode' => 'HTML',
+        ];
+
+        if ($replyMarkup) {
+            $payload['reply_markup'] = $replyMarkup;
+        }
+
+        $this->http()->post('sendMessage', $payload)->throw();
+    }
+
+    public function answerCallbackQuery(string $callbackQueryId): void
+    {
+        $this->http()->post('answerCallbackQuery', [
+            'callback_query_id' => $callbackQueryId,
         ])->throw();
     }
 

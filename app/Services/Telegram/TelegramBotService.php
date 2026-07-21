@@ -48,6 +48,33 @@ class TelegramBotService
         };
     }
 
+    public function handleCallbackQuery(array $callbackQuery): void
+    {
+        $id = (string) ($callbackQuery['id'] ?? '');
+        $message = $callbackQuery['message'] ?? [];
+        $chatId = $message['chat']['id'] ?? null;
+        $data = (string) ($callbackQuery['data'] ?? '');
+
+        if ($id !== '') {
+            $this->telegram->answerCallbackQuery($id);
+        }
+
+        if (!$chatId) {
+            return;
+        }
+
+        $user = $this->telegramUser([
+            'from' => $callbackQuery['from'] ?? [],
+            'chat' => $message['chat'] ?? [],
+        ]);
+
+        match ($data) {
+            'status' => $this->sendStatus($user, $chatId),
+            'logout' => $this->logout($user, $chatId),
+            default => null,
+        };
+    }
+
     private function start(TelegramUser $user, int|string $chatId): void
     {
         $binding = $user->uonBinding;
@@ -60,7 +87,8 @@ class TelegramBotService
 
             $this->telegram->sendMessage(
                 $chatId,
-                "Вы уже вошли по договору/заявке: ".$binding->contract_number."\nТелефон: ".$binding->phone."\n\nЧтобы перейти к другому договору, отправьте /logout и войдите заново.\n\nДля просмотра текущей информации отправьте /status."
+                "Вы уже вошли по договору/заявке: ".$binding->contract_number."\nТелефон: ".$binding->phone,
+                $this->statusKeyboard()
             );
             return;
         }
@@ -163,7 +191,7 @@ class TelegramBotService
 
         $binding = $this->uonRequests->refresh($binding);
 
-        $this->telegram->sendMessage($chatId, $this->uonRequests->formatSummary($binding));
+        $this->telegram->sendMessage($chatId, $this->uonRequests->formatSummary($binding), $this->statusKeyboard());
     }
 
     private function sendStatus(TelegramUser $user, int|string $chatId): void
@@ -185,7 +213,7 @@ class TelegramBotService
 
         try {
             $binding = $this->uonRequests->refresh($binding);
-            $this->telegram->sendMessage($chatId, $this->uonRequests->formatSummary($binding));
+            $this->telegram->sendMessage($chatId, $this->uonRequests->formatSummary($binding), $this->statusKeyboard());
         } catch (RequestException $exception) {
             Log::error('U-ON status refresh request failed', [
                 'telegram_user_id' => $user->id,
@@ -257,5 +285,19 @@ class TelegramBotService
         }
 
         return 'Не удалось обратиться к U-ON. Попробуйте позже.';
+    }
+
+    private function statusKeyboard(): array
+    {
+        return [
+            'inline_keyboard' => [
+                [
+                    ['text' => 'Обновить данные', 'callback_data' => 'status'],
+                ],
+                [
+                    ['text' => 'Другой договор', 'callback_data' => 'logout'],
+                ],
+            ],
+        ];
     }
 }

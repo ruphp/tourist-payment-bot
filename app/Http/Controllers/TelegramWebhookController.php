@@ -17,9 +17,14 @@ class TelegramWebhookController extends Controller
 
         $update = $request->all();
         $message = $update['message'] ?? null;
+        $callbackQuery = $update['callback_query'] ?? null;
 
         if ($message) {
             $bot->handleMessage($message);
+        }
+
+        if ($callbackQuery) {
+            $bot->handleCallbackQuery($callbackQuery);
         }
 
         Log::info('Telegram update received', [
