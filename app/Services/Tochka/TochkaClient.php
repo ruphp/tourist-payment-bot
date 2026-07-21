@@ -32,7 +32,9 @@ class TochkaClient
 
     public function createPayment(array $payload): Response
     {
-        return $this->http()->post('acquiring/v1.0/payments', $payload);
+        return $this->http()->post('acquiring/v1.0/payments', [
+            'Data' => $payload,
+        ]);
     }
 
     private function http(): PendingRequest
