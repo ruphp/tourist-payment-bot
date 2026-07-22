@@ -52,6 +52,7 @@ return [
         'customer_code' => env('TOCHKA_CUSTOMER_CODE'),
         'merchant_id' => env('TOCHKA_MERCHANT_ID'),
         'terminal_id' => env('TOCHKA_TERMINAL_ID'),
+        'payment_ttl' => env('TOCHKA_PAYMENT_TTL', 60),
         'webhook_secret' => env('TOCHKA_WEBHOOK_SECRET'),
     ],
 

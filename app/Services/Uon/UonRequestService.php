@@ -102,6 +102,20 @@ class UonRequestService
         return implode("\n", $lines);
     }
 
+    public function balanceRubles(UonBinding $binding): float
+    {
+        $request = $binding->last_request_snapshot ?? [];
+        $price = $this->number($this->value($request, ['calc_price']));
+        $paid = $this->number($this->value($request, ['calc_client', 'calc_increase']));
+
+        return max(0, $price - $paid);
+    }
+
+    public function formatRubles(float $value): string
+    {
+        return $this->money($value).' руб.';
+    }
+
     private function findByContractNumber(string $contractNumber): ?array
     {
         $number = trim($contractNumber);

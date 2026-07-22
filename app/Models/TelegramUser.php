@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class TelegramUser extends Model
@@ -23,5 +24,10 @@ class TelegramUser extends Model
     public function uonBinding(): HasOne
     {
         return $this->hasOne(UonBinding::class);
+    }
+
+    public function tochkaPayments(): HasMany
+    {
+        return $this->hasMany(TochkaPayment::class);
     }
 }

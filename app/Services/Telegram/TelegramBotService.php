@@ -3,6 +3,8 @@
 namespace App\Services\Telegram;
 
 use App\Models\TelegramUser;
+use App\Models\TochkaPayment;
+use App\Services\Tochka\TochkaPaymentService;
 use App\Services\Uon\UonRequestService;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Log;
@@ -12,6 +14,7 @@ class TelegramBotService
     public function __construct(
         private readonly TelegramClient $telegram,
         private readonly UonRequestService $uonRequests,
+        private readonly TochkaPaymentService $tochkaPayments,
     ) {
     }
 
@@ -43,6 +46,7 @@ class TelegramBotService
 
         match ($user->state) {
             'awaiting_phone' => $this->handlePhone($user, $chatId, $text),
+            'awaiting_payment_amount' => $this->handlePaymentAmount($user, $chatId, $text),
             'authorized' => $this->sendStatus($user, $chatId),
             default => $this->handleContractNumber($user, $chatId, $text),
         };
@@ -71,6 +75,7 @@ class TelegramBotService
         match ($data) {
             'status' => $this->sendStatus($user, $chatId),
             'logout' => $this->logout($user, $chatId),
+            'pay' => $this->startPayment($user, $chatId),
             default => null,
         };
     }
@@ -252,6 +257,160 @@ class TelegramBotService
         );
     }
 
+    private function startPayment(TelegramUser $user, int|string $chatId): void
+    {
+        $binding = $user->uonBinding;
+
+        if (!$binding) {
+            $this->start($user, $chatId);
+            return;
+        }
+
+        if (!$this->tochkaPayments->isConfigured()) {
+            $this->telegram->sendMessage($chatId, 'Оплата через бот еще не настроена.');
+            return;
+        }
+
+        if (!$this->tochkaPayments->canAcceptNow()) {
+            $this->telegram->sendMessage(
+                $chatId,
+                'Платежи принимаются с '.config('payments.accept_from', '07:00').' до '.config('payments.accept_until', '17:00').' по МСК.'
+            );
+            return;
+        }
+
+        if ($pending = $this->tochkaPayments->pendingPayment($binding)) {
+            $this->sendPaymentLink($chatId, $pending);
+            return;
+        }
+
+        try {
+            $binding = $this->uonRequests->refresh($binding);
+        } catch (\Throwable $exception) {
+            Log::error('U-ON refresh before payment failed', [
+                'telegram_user_id' => $user->id,
+                'exception' => $exception,
+            ]);
+
+            $this->telegram->sendMessage($chatId, 'Не удалось обновить остаток по заявке. Попробуйте позже.');
+            return;
+        }
+
+        $balance = $this->uonRequests->balanceRubles($binding);
+
+        if ($balance <= 0) {
+            $this->telegram->sendMessage($chatId, 'По заявке нет остатка к оплате.', $this->statusKeyboard());
+            return;
+        }
+
+        $user->forceFill([
+            'state' => 'awaiting_payment_amount',
+            'state_data' => ['uon_binding_id' => $binding->id],
+        ])->save();
+
+        $this->telegram->sendMessage(
+            $chatId,
+            "Введите сумму оплаты в рублях.\n\nОстаток: ".$this->uonRequests->formatRubles($balance)
+        );
+    }
+
+    private function handlePaymentAmount(TelegramUser $user, int|string $chatId, string $text): void
+    {
+        $binding = $user->uonBinding;
+
+        if (!$binding) {
+            $this->start($user, $chatId);
+            return;
+        }
+
+        if (!$this->tochkaPayments->isConfigured()) {
+            $user->forceFill(['state' => 'authorized', 'state_data' => []])->save();
+            $this->telegram->sendMessage($chatId, 'Оплата через бот еще не настроена.');
+            return;
+        }
+
+        if (!$this->tochkaPayments->canAcceptNow()) {
+            $user->forceFill(['state' => 'authorized', 'state_data' => []])->save();
+            $this->telegram->sendMessage(
+                $chatId,
+                'Платежи принимаются с '.config('payments.accept_from', '07:00').' до '.config('payments.accept_until', '17:00').' по МСК.',
+                $this->statusKeyboard()
+            );
+            return;
+        }
+
+        $amount = $this->parseAmount($text);
+
+        if ($amount === null) {
+            $this->telegram->sendMessage($chatId, 'Введите сумму цифрами, например: 10000');
+            return;
+        }
+
+        try {
+            $binding = $this->uonRequests->refresh($binding);
+        } catch (\Throwable $exception) {
+            Log::error('U-ON refresh before payment amount failed', [
+                'telegram_user_id' => $user->id,
+                'exception' => $exception,
+            ]);
+
+            $this->telegram->sendMessage($chatId, 'Не удалось обновить остаток по заявке. Попробуйте позже.');
+            return;
+        }
+
+        $balance = $this->uonRequests->balanceRubles($binding);
+
+        if ($amount > $balance) {
+            $this->telegram->sendMessage(
+                $chatId,
+                'Сумма больше остатка. Остаток: '.$this->uonRequests->formatRubles($balance)
+            );
+            return;
+        }
+
+        $this->telegram->sendMessage($chatId, 'Создаю ссылку на оплату...');
+
+        try {
+            $payment = $this->tochkaPayments->createLink($binding, $amount);
+        } catch (\Throwable $exception) {
+            Log::error('Tochka payment link creation failed', [
+                'telegram_user_id' => $user->id,
+                'uon_binding_id' => $binding->id,
+                'exception' => $exception,
+            ]);
+
+            $this->telegram->sendMessage($chatId, 'Не удалось создать ссылку на оплату. Попробуйте позже.');
+            return;
+        }
+
+        $user->forceFill(['state' => 'authorized', 'state_data' => []])->save();
+
+        $this->sendPaymentLink($chatId, $payment);
+    }
+
+    private function sendPaymentLink(int|string $chatId, TochkaPayment $payment): void
+    {
+        if (!$payment->payment_url) {
+            $this->telegram->sendMessage($chatId, 'Ссылка создана, но Точка не вернула URL. Сообщите менеджеру.');
+            return;
+        }
+
+        $this->telegram->sendMessage(
+            $chatId,
+            "Ссылка на оплату создана.\n\nСумма: ".$this->uonRequests->formatRubles((float) $payment->amount)."\nПосле оплаты данные обновятся после подтверждения банка.",
+            [
+                'inline_keyboard' => [
+                    [
+                        ['text' => 'Оплатить через СБП', 'url' => $payment->payment_url],
+                    ],
+                    [
+                        ['text' => 'Обновить данные', 'callback_data' => 'status'],
+                    ],
+                ],
+            ]
+        );
+    }
+
     private function telegramUser(array $message): TelegramUser
     {
         $from = $message['from'] ?? [];
@@ -292,10 +451,24 @@ class TelegramBotService
         return [
             'inline_keyboard' => [
                 [
+                    ['text' => 'Оплатить', 'callback_data' => 'pay'],
                     ['text' => 'Обновить данные', 'callback_data' => 'status'],
                     ['text' => 'Другой договор', 'callback_data' => 'logout'],
                 ],
             ],
         ];
+    }
+
+    private function parseAmount(string $text): ?float
+    {
+        $normalized = str_replace([' ', ','], ['', '.'], trim($text));
+
+        if (!is_numeric($normalized)) {
+            return null;
+        }
+
+        $amount = round((float) $normalized, 2);
+
+        return $amount > 0 ? $amount : null;
     }
 }

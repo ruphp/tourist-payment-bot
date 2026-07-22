@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class UonBinding extends Model
 {
@@ -25,5 +26,10 @@ class UonBinding extends Model
     public function telegramUser(): BelongsTo
     {
         return $this->belongsTo(TelegramUser::class);
+    }
+
+    public function tochkaPayments(): HasMany
+    {
+        return $this->hasMany(TochkaPayment::class);
     }
 }
