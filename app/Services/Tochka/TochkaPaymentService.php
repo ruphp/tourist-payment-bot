@@ -57,7 +57,7 @@ class TochkaPaymentService
             $payload = [
                 'amount' => round($amount, 2),
                 'customerCode' => (string) config('services.tochka.customer_code'),
-                'purpose' => 'Tour payment for request '.$binding->contract_number,
+                'purpose' => 'Оплата по договору №'.$binding->contract_number.' о реализации туристического продукта',
                 'paymentMode' => ['sbp'],
                 'merchantId' => (string) config('services.tochka.merchant_id'),
                 'ttl' => (int) config('services.tochka.payment_ttl', 60),

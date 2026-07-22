@@ -111,6 +111,42 @@ class UonRequestService
         return max(0, $price - $paid);
     }
 
+    public function payableRubles(UonBinding $binding): float
+    {
+        $balance = $this->balanceRubles($binding);
+        $request = $binding->last_request_snapshot ?? [];
+        $price = $this->number($this->value($request, ['calc_price']));
+        $paid = $this->number($this->value($request, ['calc_client', 'calc_increase']));
+        $tourCurrency = $this->tourCurrencySummary($request, $price, $paid, $balance);
+
+        if (($tourCurrency['balance'] ?? null) !== null && ($tourCurrency['rate'] ?? null) !== null) {
+            return max(0, round($tourCurrency['balance'] * $tourCurrency['rate'], 2));
+        }
+
+        return $balance;
+    }
+
+    public function formatBalance(UonBinding $binding): string
+    {
+        $request = $binding->last_request_snapshot ?? [];
+        $price = $this->number($this->value($request, ['calc_price']));
+        $paid = $this->number($this->value($request, ['calc_client', 'calc_increase']));
+        $balance = max(0, $price - $paid);
+        $currency = $this->currencyLabel($request);
+        $tourCurrency = $this->tourCurrencySummary($request, $price, $paid, $balance);
+        $rate = $tourCurrency['rate'] ?? null;
+        $tourBalance = $tourCurrency['balance'] ?? null;
+        $tourCurrencyLabel = $tourCurrency['currency'] ?? null;
+        $payable = $this->payableRubles($binding);
+
+        return implode("\n", [
+            '<b>Остаток</b>',
+            'Долг: '.$this->moneyWithTourCurrency($balance, $currency, $tourBalance, $tourCurrencyLabel),
+            'Курс оператора: '.($rate ? $this->money($rate).' руб.' : 'не найден'),
+            'К доплате: '.$this->money($payable).' руб.',
+        ]);
+    }
+
     public function formatRubles(float $value): string
     {
         return $this->money($value).' руб.';

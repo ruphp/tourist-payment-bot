@@ -75,6 +75,7 @@ class TelegramBotService
         match ($data) {
             'status' => $this->sendStatus($user, $chatId),
             'logout' => $this->logout($user, $chatId),
+            'balance' => $this->sendBalance($user, $chatId),
             'pay' => $this->startPayment($user, $chatId),
             default => null,
         };
@@ -243,6 +244,50 @@ class TelegramBotService
         }
     }
 
+    private function sendBalance(TelegramUser $user, int|string $chatId): void
+    {
+        $binding = $user->uonBinding;
+
+        if (!$binding) {
+            $this->start($user, $chatId);
+            return;
+        }
+
+        if (!$this->uonRequests->isConfigured()) {
+            $this->telegram->sendMessage(
+                $chatId,
+                'Интеграция с U-ON еще не настроена. Нужен UON_API_KEY.'
+            );
+            return;
+        }
+
+        try {
+            $binding = $this->uonRequests->refresh($binding);
+            $this->telegram->sendMessage($chatId, $this->uonRequests->formatBalance($binding), $this->statusKeyboard());
+        } catch (RequestException $exception) {
+            Log::error('U-ON balance refresh request failed', [
+                'telegram_user_id' => $user->id,
+                'status' => $exception->response->status(),
+                'body' => $exception->response->body(),
+            ]);
+
+            $this->telegram->sendMessage(
+                $chatId,
+                $this->uonErrorMessage($exception)
+            );
+        } catch (\Throwable $exception) {
+            Log::error('U-ON balance refresh failed', [
+                'telegram_user_id' => $user->id,
+                'exception' => $exception,
+            ]);
+
+            $this->telegram->sendMessage(
+                $chatId,
+                'Не удалось обновить остаток по заявке. Попробуйте позже.'
+            );
+        }
+    }
+
     private function logout(TelegramUser $user, int|string $chatId): void
     {
         $user->uonBinding()->delete();
@@ -296,7 +341,7 @@ class TelegramBotService
             return;
         }
 
-        $balance = $this->uonRequests->balanceRubles($binding);
+        $balance = $this->uonRequests->payableRubles($binding);
 
         if ($balance <= 0) {
             $this->telegram->sendMessage($chatId, 'По заявке нет остатка к оплате.', $this->statusKeyboard());
@@ -310,7 +355,7 @@ class TelegramBotService
 
         $this->telegram->sendMessage(
             $chatId,
-            "Введите сумму оплаты в рублях.\n\nОстаток: ".$this->uonRequests->formatRubles($balance)
+            "Введите сумму оплаты в рублях.\n\nК доплате: ".$this->uonRequests->formatRubles($balance)
         );
     }
 
@@ -358,12 +403,12 @@ class TelegramBotService
             return;
         }
 
-        $balance = $this->uonRequests->balanceRubles($binding);
+        $balance = $this->uonRequests->payableRubles($binding);
 
         if ($amount > $balance) {
             $this->telegram->sendMessage(
                 $chatId,
-                'Сумма больше остатка. Остаток: '.$this->uonRequests->formatRubles($balance)
+                'Сумма больше остатка. К доплате: '.$this->uonRequests->formatRubles($balance)
             );
             return;
         }
@@ -451,9 +496,12 @@ class TelegramBotService
         return [
             'inline_keyboard' => [
                 [
-                    ['text' => 'Оплатить', 'callback_data' => 'pay'],
                     ['text' => 'Обновить данные', 'callback_data' => 'status'],
                     ['text' => 'Другой договор', 'callback_data' => 'logout'],
+                ],
+                [
+                    ['text' => 'Узнать остаток', 'callback_data' => 'balance'],
+                    ['text' => 'Оплатить', 'callback_data' => 'pay'],
                 ],
             ],
         ];
